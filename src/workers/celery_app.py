@@ -12,6 +12,7 @@ celery_app = Celery(
         "src.workers.tasks.notifications",
         "src.workers.tasks.ai_processing",
         "src.workers.tasks.broker_sync",
+        "src.workers.tasks.ml_training",
     ],
 )
 
@@ -63,5 +64,20 @@ celery_app.conf.beat_schedule = {
     "check-broker-token-expiry": {
         "task": "src.workers.tasks.broker_sync.check_broker_token_expiry",
         "schedule": crontab(minute=30),  # Every hour at :30
+    },
+    # ML model retraining - weekly on Sunday at 2 AM
+    "retrain-ml-models-weekly": {
+        "task": "src.workers.tasks.ml_training.retrain_all_models",
+        "schedule": crontab(hour=2, minute=0, day_of_week=0),  # Sunday 2 AM
+    },
+    # Clean up old model versions monthly
+    "cleanup-old-models-monthly": {
+        "task": "src.workers.tasks.ml_training.cleanup_old_models",
+        "schedule": crontab(hour=3, minute=0, day_of_month=1),  # 1st of month at 3 AM
+    },
+    # Clear prediction cache daily
+    "clear-ml-cache-daily": {
+        "task": "src.workers.tasks.ml_training.clear_prediction_cache",
+        "schedule": crontab(hour=0, minute=0),  # Midnight
     },
 }

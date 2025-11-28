@@ -1,5 +1,5 @@
-# Backend Dockerfile
-FROM python:3.12-slim
+# Multi-stage build for ML dependencies
+FROM python:3.12-slim as builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -9,12 +9,23 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     POETRY_VIRTUALENVS_CREATE=false \
     POETRY_NO_INTERACTION=1
 
-# Install system dependencies
+# Install build dependencies including TA-Lib requirements
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    wget \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Install TA-Lib C library (required for technical indicators)
+RUN wget http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
+    tar -xzf ta-lib-0.4.0-src.tar.gz && \
+    cd ta-lib/ && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf ta-lib ta-lib-0.4.0-src.tar.gz
 
 # Install Poetry
 RUN curl -sSL https://install.python-poetry.org | python3 -
@@ -27,13 +38,38 @@ WORKDIR /app
 COPY pyproject.toml poetry.lock* ./
 
 # Install dependencies
-RUN poetry install --no-root --no-dev || poetry install --no-root
+RUN poetry install --no-root --without dev
+
+# Final stage
+FROM python:3.12-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy TA-Lib from builder
+COPY --from=builder /usr/lib/libta_lib.* /usr/lib/
+COPY --from=builder /usr/include/ta-lib/ /usr/include/ta-lib/
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Set work directory
+WORKDIR /app
 
 # Copy application code
 COPY . .
 
-# Install the application
-RUN poetry install --no-dev || poetry install
+# Create directories for ML models and user data
+RUN mkdir -p /app/models /app/data
 
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser && \

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from src.api.v1.endpoints import auth, users, portfolio, market, chat, profile, recommendations, transactions, alerts, exports, ws, brokers, subscriptions, privacy, health, analytics, reports, community, public_api, dashboard, notifications, settings, newsletter
+from src.api.v1.endpoints import auth, users, portfolio, market, chat, profile, recommendations, transactions, alerts, exports, ws, brokers, subscriptions, privacy, health, analytics, reports, community, public_api, dashboard, notifications, settings, newsletter, ml
 
 api_router = APIRouter()
 
@@ -163,4 +163,11 @@ api_router.include_router(
     newsletter.router,
     prefix="/newsletter",
     tags=["Newsletter"],
+)
+
+# Machine Learning endpoints
+api_router.include_router(
+    ml.router,
+    prefix="/ml",
+    tags=["Machine Learning"],
 )
